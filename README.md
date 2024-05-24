@@ -11,4 +11,4 @@ Importation des annotations:
     import mg.itu.prom16.annotation.Controller;
     import mg.itu.prom16.annotation.Get;
 
-NB: La Jar du framework se trouve dans classes/jars qui est necessaire dans la librairie du projet
+NB: La Jar du framework se trouve dans classes/jars qui est necessaire dans la librairie du projet Web
