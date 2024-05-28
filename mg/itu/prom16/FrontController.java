@@ -64,9 +64,12 @@ public class FrontController extends HttpServlet{
         out.print("Fonction correspondant a l'url : \t");
         String slach = "/";
         String[] urlSplited = url.split(slach);
-        Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
+        Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]); 
         if(map != null){
-            out.print(map.getClassName()+" -> "+map.getFunctionName());
+            out.println(map.getClassName()+" -> "+map.getFunctionName());
+
+            out.println("");
+            out.println("valeur que la fonction retourne : "+this.callMethod(map));
         }else {
             out.print("Aucune fonction correspondante");
         }
@@ -119,5 +122,22 @@ public class FrontController extends HttpServlet{
                 }
             }
         }
+    }
+
+    public String callMethod(Mapping m){
+        String val = "Tay";
+        try{
+            Class<?> classe = Class.forName(m.getClassName());
+            Object obj = classe.newInstance();
+
+            Method method = obj.getClass().getDeclaredMethod(m.getFunctionName(), null);
+            // val = method.getName();
+            val = (String) method.invoke(obj, null);
+        }
+        catch(Exception e){
+            val = e.getMessage();
+            e.printStackTrace();
+        }
+        return val;
     }
 }
