@@ -13,8 +13,6 @@ public class Utils {
     public static ArrayList<String> allControlerName (String controllerPackage){
         ArrayList<String> listControler = new ArrayList<String>();
         try{
-            // String controllerPackage = getServletConfig().getInitParameter("Controllers");
-            // out.println(controllerPackage);
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
             URL url = loader.getResource(controllerPackage);
             // out.println(url.getFile().replace("%20", " "));
@@ -43,7 +41,8 @@ public class Utils {
         return listControler;
     }
 
-    public static void allAnnotedGetFunction (Map<String , Mapping> annotedGetFunction , String controllerPackage)throws Exception{
+    public static ArrayList<String> allAnnotedGetFunction (Map<String , Mapping> annotedGetFunction , String controllerPackage)throws Exception{
+        ArrayList<String> doublons = new ArrayList<>();
         ArrayList<String> listControler = allControlerName(controllerPackage);
         for(int i=0 ; i<listControler.size() ; i++){
             Class<?> controler = Class.forName(listControler.get(i));
@@ -53,10 +52,25 @@ public class Utils {
                 if(method[j].isAnnotationPresent(Get.class)){
                     Mapping map = new Mapping(listControler.get(i) , method[j].getName());
                     Get annotation = method[j].getAnnotation(Get.class);
-                    annotedGetFunction.put(annotation.value(), map);
+                    if(urlAlreadyExist(annotedGetFunction, annotation.value()) == 0){
+                        annotedGetFunction.put(annotation.value(), map);
+                    }
+                    else{
+                        doublons.add(annotation.value());
+                    }
                 }
             }
         }
+        return doublons;
+    }
+
+    public static int urlAlreadyExist (Map<String , Mapping> annotedGetFunction , String url){
+        for(String key: annotedGetFunction.keySet()){
+            if(key.equals(url)){
+                return 1;
+            }
+        }
+        return 0;
     }
 
     public static Object callFunction(Mapping map){
@@ -71,5 +85,21 @@ public class Utils {
             
         }
         return returned;
+    }
+
+    public static String ErrorPage(String title , String cause){
+        String val = "";
+        val += "<html>";
+        val += "<head>";
+        val += "<title>Error Framework 2362</title>";
+        val += "</head>";    
+        val += "<body>";
+
+        val += "<h1>"+title+"</h1>";
+        val += "<h3>"+cause+"</h3>";
+
+        val += "</body>";
+        val += "</html>";
+        return val;
     }
 }
