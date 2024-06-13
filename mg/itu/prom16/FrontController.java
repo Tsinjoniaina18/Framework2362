@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.lang.Package;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.net.URL;
 
 public class FrontController extends HttpServlet{
@@ -73,40 +74,56 @@ public class FrontController extends HttpServlet{
 
         if(this.controllerPackage!=null){
             String url = req.getRequestURL().toString();
-            // out.println(url);
 
-            /*ArrayList<String> listControler = Utils.allControlerName(this.controllerPackage);
-            out.println("");
-            out.println("Liste des controllers : ");
-            for(int i=0 ; i<listControler.size() ; i++){
-                out.println(listControler.get(i));
-            }*/
-
-            out.println("");
-            out.print("Fonction correspondant a l'url : \t");
+            /*out.println("");
+            out.print("Fonction correspondant a l'url : \t");*/
             String slach = "/";
             String[] urlSplited = url.split(slach);
             Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
             if(map != null){
-                out.println(map.getClassName()+" -> "+map.getFunctionName());
+                // out.println(map.getClassName()+" -> "+map.getFunctionName());
 
                 Object returned = Utils.callFunction(map);
-                if(returned.getClass().getName().equals("java.lang.String")){
+                if(returned instanceof java.lang.String){
                     out.println("Valeur de retour : "+returned);
                 }
-                else if(returned.getClass().getName().equals("mg.itu.prom16.mapping.ModelView")){
+                else if(returned instanceof mg.itu.prom16.mapping.ModelView){
 
                     ModelView mv = (ModelView)returned;
-                    // out.println(mv.getUrl());
 
                     mv.getObject().forEach(
                         (cle , valeur)->req.setAttribute(cle , valeur)
-                        // (cle , valeur)->out.println(cle+" -> "+valeur)
                     );
 
                     RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
                     dispat.forward(req,res);
 
+                }
+                else if(returned instanceof java.lang.reflect.Method){
+                    Method method = (Method) returned;
+                    ArrayList<String> parameterNames = Utils.parameterNames(method);
+                    ArrayList<String> requestValues = new ArrayList<String>();
+                    Class<?>[] types = method.getParameterTypes();
+                    for(int i=0 ; i<parameterNames.size() ; i++){
+                        requestValues.add(req.getParameter(parameterNames.get(i)));
+                        out.print(parameterNames.get(i)+" : ");
+                        out.print(requestValues.get(i)+" , ");
+                        out.print(types[i].getName()+" | ");
+                    }
+
+                    /*if(obj instanceof mg.itu.prom16.mapping.ModelView){*/
+                        try{
+                            ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues);
+                            mv.getObject().forEach(
+                                (cle , valeur)->req.setAttribute(cle , valeur)
+                            );
+
+                            RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
+                            dispat.forward(req,res);
+                        }catch(Exception e){
+                            out.print(e);
+                        }
+                    // }*/
                 }
                 else{
                     String title = "Error 1802: Invalid return value";
