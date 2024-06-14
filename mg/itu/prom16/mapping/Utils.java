@@ -2,12 +2,14 @@ package mg.itu.prom16.mapping;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Map;
 
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
+import mg.itu.prom16.annotation.Param;
 
 public class Utils {
     public static ArrayList<String> allControlerName (String controllerPackage){
@@ -78,13 +80,80 @@ public class Utils {
         try {
             Class<?> classe = Class.forName(map.getClassName());
             Object obj = classe.newInstance();
-            Method method = obj.getClass().getDeclaredMethod(map.getFunctionName() , null);
+            // Method method = obj.getClass().getDeclaredMethod(map.getFunctionName() , null);
+            Method method = (Method)determineMethod(map);
 
-            returned = method.invoke(obj, null);
+            if(method.getParameterCount()==0){
+                returned = method.invoke(obj, null);
+            }
+            else{
+                returned = method;
+            }
         } catch (Exception e) {
             
         }
         return returned;
+    }
+
+    public static Object determineMethod(Mapping map){
+        Object returned = null;
+        try{
+            Class<?> classe = Class.forName(map.getClassName());
+            Object obj = classe.newInstance();
+            Method[] methods = obj.getClass().getDeclaredMethods();
+            for(int i=0 ; i<methods.length ; i++){
+                if(methods[i].getName().equals(map.getFunctionName())){
+                    Class<?>[] parameterTypes = methods[i].getParameterTypes();
+                    returned = obj.getClass().getDeclaredMethod(map.getFunctionName(), parameterTypes);
+                    break;
+                }
+            }
+        }catch(Exception e){
+
+        }
+        return returned;
+    }
+
+    public static ArrayList<String> parameterNames(Method method){
+        Parameter[] parameterNames = method.getParameters();
+        ArrayList<String> names = new ArrayList<String>();
+        for(int i=0 ; i<parameterNames.length ; i++){
+            if(parameterNames[i].isAnnotationPresent(Param.class)){
+                Param annotation = parameterNames[i].getAnnotation(Param.class);
+                names.add(annotation.value());
+            }else{
+                names.add(parameterNames[i].getName());
+            }
+        }
+        return names;
+    }
+
+    public static Object callFunction2(Mapping map , Method method , ArrayList<String> requestValue)throws Exception{
+        Object returned = null;
+        Object[] parameters = castToRigthType(method, requestValue);
+        Class<?> classe = Class.forName(map.getClassName());
+        Object obj = classe.newInstance();
+        returned = method.invoke(obj, parameters);
+        return returned;
+    }
+
+    public static Object[] castToRigthType(Method method , ArrayList<String> requestValue)throws Exception{
+        Object[] objs = new Object[requestValue.size()];
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        for(int i = 0 ; i<parameterTypes.length ; i++){
+            objs[i] = requestValue.get(i);
+            try{    
+                if(parameterTypes[i].getSimpleName().equalsIgnoreCase("int")){
+                    objs[i] = Integer.parseInt(requestValue.get(i));
+                }
+                if(parameterTypes[i].getName().equalsIgnoreCase("double")){
+                    objs[i] = Double.parseDouble(requestValue.get(i));
+                }
+            }catch(Exception e){
+                throw e;
+            }
+        }
+        return objs;
     }
 
     public static String ErrorPage(String title , String cause){
