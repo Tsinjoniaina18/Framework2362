@@ -1,6 +1,7 @@
 package mg.itu.prom16.mapping;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
@@ -9,6 +10,7 @@ import java.util.Map;
 
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
+import mg.itu.prom16.annotation.NameField;
 import mg.itu.prom16.annotation.Param;
 
 public class Utils {
@@ -118,11 +120,31 @@ public class Utils {
         Parameter[] parameterNames = method.getParameters();
         ArrayList<String> names = new ArrayList<String>();
         for(int i=0 ; i<parameterNames.length ; i++){
-            if(parameterNames[i].isAnnotationPresent(Param.class)){
-                Param annotation = parameterNames[i].getAnnotation(Param.class);
-                names.add(annotation.value());
-            }else{
-                names.add(parameterNames[i].getName());
+            if(parameterNames[i].getType().isPrimitive() || parameterNames[i].getType()==String.class){
+                if(parameterNames[i].isAnnotationPresent(Param.class)){
+                    Param annotation = parameterNames[i].getAnnotation(Param.class);
+                    names.add(annotation.value());
+                }else{
+                    names.add(parameterNames[i].getName());
+                }
+            }
+            else{
+                String nom = parameterNames[i].getName();
+                if(parameterNames[i].isAnnotationPresent(Param.class)){
+                    Param annotation = parameterNames[i].getAnnotation(Param.class);
+                    nom = annotation.value();
+                }
+                Class<?> obj = parameterNames[i].getType();
+                Field[] attributs = obj.getDeclaredFields();
+                for(int j=0 ; j<attributs.length ; j++){
+                    if(attributs[j].isAnnotationPresent(NameField.class)){
+                        NameField annotation = attributs[j].getAnnotation(NameField.class);
+                        names.add(nom+"."+annotation.value());
+                    }
+                    else{
+                        names.add(nom+"."+attributs[j].getName());
+                    }
+                }
             }
         }
         return names;
@@ -137,23 +159,69 @@ public class Utils {
         return returned;
     }
 
+    public static Object caster (String data , String type){
+        if(data==null){
+            return 0;    
+        }
+        if(type.equalsIgnoreCase("int")){
+            return Integer.parseInt(data);
+        }
+        else if(type.equalsIgnoreCase("double")){
+            return Double.parseDouble(data);
+        }
+        else if(type.equalsIgnoreCase("long")){
+            return Long.parseLong(data);
+        }
+        return data;
+    }
+
     public static Object[] castToRigthType(Method method , ArrayList<String> requestValue)throws Exception{
-        Object[] objs = new Object[requestValue.size()];
+        Object[] objs = new Object[method.getParameterTypes().length];
         Class<?>[] parameterTypes = method.getParameterTypes();
-        for(int i = 0 ; i<parameterTypes.length ; i++){
-            objs[i] = requestValue.get(i);
-            try{    
-                if(parameterTypes[i].getSimpleName().equalsIgnoreCase("int")){
-                    objs[i] = Integer.parseInt(requestValue.get(i));
+        int indArg = 0;
+        for(int i = 0 ; i<requestValue.size() ; i++){
+
+            if(parameterTypes[indArg].isPrimitive() || parameterTypes[indArg] == String.class){
+                objs[indArg] = caster(requestValue.get(i) , parameterTypes[indArg].getSimpleName());
+                indArg++;
+            }else{
+                Class<?> obj = parameterTypes[indArg];
+                Object obj2 = obj.newInstance();
+                Field[] attributs = obj.getDeclaredFields();
+                Object[] attributValues = new Object[attributs.length];
+                for(int j=0 ; j<attributs.length ; j++){
+                    attributValues[j] = caster(requestValue.get(i), attributs[j].getType().getSimpleName());
+                    i++;
                 }
-                if(parameterTypes[i].getName().equalsIgnoreCase("double")){
-                    objs[i] = Double.parseDouble(requestValue.get(i));
+
+                obj2 = process(obj2 , attributValues);
+                objs[indArg] = obj2;
+                indArg++;
+                if(attributs.length>0){
+                    i--;
                 }
-            }catch(Exception e){
-                throw e;
             }
+
         }
         return objs;
+    }
+
+    public static <T> T process(T object , Object[] attributValues)throws Exception{
+        Class<?> clazz = object.getClass();
+        Field[] attributs = clazz.getDeclaredFields();
+
+        for(int i=0 ; i<attributs.length ; i++){
+            Field attribut = attributs[i];
+            attribut.setAccessible(true);
+            Object valeur = attributValues[i];
+            if(valeur != null){
+                attribut.set(object, valeur);
+            }else{
+                attribut.set(object, null);
+            }
+        }
+
+        return object;
     }
 
     public static String ErrorPage(String title , String cause){

@@ -75,13 +75,10 @@ public class FrontController extends HttpServlet{
         if(this.controllerPackage!=null){
             String url = req.getRequestURL().toString();
 
-            /*out.println("");
-            out.print("Fonction correspondant a l'url : \t");*/
             String slach = "/";
             String[] urlSplited = url.split(slach);
             Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
             if(map != null){
-                // out.println(map.getClassName()+" -> "+map.getFunctionName());
 
                 Object returned = Utils.callFunction(map);
                 if(returned instanceof java.lang.String){
@@ -108,22 +105,18 @@ public class FrontController extends HttpServlet{
                         requestValues.add(req.getParameter(parameterNames.get(i)));
                         out.print(parameterNames.get(i)+" : ");
                         out.print(requestValues.get(i)+" , ");
-                        out.print(types[i].getName()+" | ");
                     }
+                    try{
+                        ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues);
+                        mv.getObject().forEach(
+                            (cle , valeur)->req.setAttribute(cle , valeur)
+                        );
 
-                    /*if(obj instanceof mg.itu.prom16.mapping.ModelView){*/
-                        try{
-                            ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues);
-                            mv.getObject().forEach(
-                                (cle , valeur)->req.setAttribute(cle , valeur)
-                            );
-
-                            RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
-                            dispat.forward(req,res);
-                        }catch(Exception e){
-                            out.print(e);
-                        }
-                    // }*/
+                        RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
+                        dispat.forward(req,res);
+                    }catch(Exception e){
+                        out.print(e);
+                    }
                 }
                 else{
                     String title = "Error 1802: Invalid return value";
