@@ -116,7 +116,7 @@ public class Utils {
         return returned;
     }
 
-    public static ArrayList<String> parameterNames(Method method){
+    public static ArrayList<String> parameterNames(Method method) throws Exception{
         Parameter[] parameterNames = method.getParameters();
         ArrayList<String> names = new ArrayList<String>();
         for(int i=0 ; i<parameterNames.length ; i++){
@@ -125,7 +125,9 @@ public class Utils {
                     Param annotation = parameterNames[i].getAnnotation(Param.class);
                     names.add(annotation.value());
                 }else{
-                    names.add(parameterNames[i].getName());
+                    // names.add(parameterNames[i].getName());
+                    Exception e = new Exception("ETU 002362 : L'argument nomme "+parameterNames[i].getName()+" n'est pas annote");
+                    throw e;
                 }
             }
             else{
@@ -133,6 +135,10 @@ public class Utils {
                 if(parameterNames[i].isAnnotationPresent(Param.class)){
                     Param annotation = parameterNames[i].getAnnotation(Param.class);
                     nom = annotation.value();
+                }
+                else{
+                    Exception e = new Exception("ETU 002362 : L'argument nomme "+nom+" n'est pas annote");
+                    throw e;
                 }
                 Class<?> obj = parameterNames[i].getType();
                 Field[] attributs = obj.getDeclaredFields();
