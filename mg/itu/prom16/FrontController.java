@@ -98,7 +98,17 @@ public class FrontController extends HttpServlet{
                 }
                 else if(returned instanceof java.lang.reflect.Method){
                     Method method = (Method) returned;
-                    ArrayList<String> parameterNames = Utils.parameterNames(method);
+                    ArrayList<String> parameterNames = new ArrayList<String>();
+                    try{
+                        parameterNames = Utils.parameterNames(method);
+                    }catch(Exception e){
+                        String title = "Error 2362";
+                        String cause = e.getMessage();
+                        String error = Utils.ErrorPage(title, cause);
+                        out.println(error);
+                        
+                        return;
+                    }
                     ArrayList<String> requestValues = new ArrayList<String>();
                     Class<?>[] types = method.getParameterTypes();
                     for(int i=0 ; i<parameterNames.size() ; i++){
