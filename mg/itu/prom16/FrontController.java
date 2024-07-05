@@ -6,36 +6,30 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
 
-import mg.itu.prom16.annotation.Controller;
-import mg.itu.prom16.annotation.Get;
 import mg.itu.prom16.mapping.Mapping;
 import mg.itu.prom16.mapping.ModelView;
 import mg.itu.prom16.mapping.Utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.lang.Package;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.net.URL;
 
 public class FrontController extends HttpServlet{
     private String controllerPackage;
-    private ArrayList<String> doublons;
+    private int error = 0;
     private Map<String , Mapping> annotedGetFunction = new HashMap<>();
 
     public void init ()throws ServletException{
         try{
             this.controllerPackage = getServletConfig().getInitParameter("Controllers");
 
-            this.doublons = Utils.allAnnotedGetFunction(this.annotedGetFunction , this.controllerPackage);
+            Utils.allAnnotedGetFunction(this.annotedGetFunction , this.controllerPackage);
         }
         catch(Exception e){
-
+            this.error = 1;
         }
     }
 
@@ -59,15 +53,8 @@ public class FrontController extends HttpServlet{
         res.setContentType("text/html");
         PrintWriter out = res.getWriter();
 
-        if(this.doublons.size()>0){
-            String error = "";
-            for(int i = 0 ; i<doublons.size() ; i++){
-                error += "\"/"+doublons.get(i)+"\"";
-                if(i<doublons.size()-1){
-                    error += ", ";
-                }
-            }
-            out.print(Utils.ErrorPage("Error 405: Url forbidden", "The root "+error+" already exist and must be declared once"));
+        if(this.error == 1){
+            out.print(Utils.ErrorPage("Error 405: Url forbidden", "One root already exist and must be declared once"));
 
             return;
         }
@@ -80,7 +67,7 @@ public class FrontController extends HttpServlet{
             Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
             if(map != null){
 
-                Object returned = Utils.callFunction(map);
+                Object returned = Utils.callFunction(map , req.getSession());
                 if(returned instanceof java.lang.String){
                     out.println("Valeur de retour : "+returned);
                 }
@@ -110,14 +97,15 @@ public class FrontController extends HttpServlet{
                         return;
                     }
                     ArrayList<String> requestValues = new ArrayList<String>();
-                    Class<?>[] types = method.getParameterTypes();
                     for(int i=0 ; i<parameterNames.size() ; i++){
-                        requestValues.add(req.getParameter(parameterNames.get(i)));
-                        out.print(parameterNames.get(i)+" : ");
-                        out.print(requestValues.get(i)+" , ");
+                        if(!parameterNames.get(i).equals("Session Traitement")){
+                            requestValues.add(req.getParameter(parameterNames.get(i)));
+                            out.print(parameterNames.get(i)+" : ");
+                            out.print(requestValues.get(i)+" , ");
+                        }
                     }
                     try{
-                        ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues);
+                        ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues , req.getSession(false));
                         mv.getObject().forEach(
                             (cle , valeur)->req.setAttribute(cle , valeur)
                         );

@@ -8,6 +8,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Map;
 
+import jakarta.servlet.http.HttpSession;
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
 import mg.itu.prom16.annotation.NameField;
@@ -45,12 +46,11 @@ public class Utils {
         return listControler;
     }
 
-    public static ArrayList<String> allAnnotedGetFunction (Map<String , Mapping> annotedGetFunction , String controllerPackage)throws Exception{
-        ArrayList<String> doublons = new ArrayList<>();
+    public static void allAnnotedGetFunction (Map<String , Mapping> annotedGetFunction , String controllerPackage)throws Exception{
         ArrayList<String> listControler = allControlerName(controllerPackage);
         for(int i=0 ; i<listControler.size() ; i++){
             Class<?> controler = Class.forName(listControler.get(i));
-            Object obj = controler.newInstance();
+            Object obj = controler.getDeclaredConstructor().newInstance();
             Method[] method = obj.getClass().getDeclaredMethods();
             for(int j=0 ; j<method.length ; j++){
                 if(method[j].isAnnotationPresent(Get.class)){
@@ -60,12 +60,12 @@ public class Utils {
                         annotedGetFunction.put(annotation.value(), map);
                     }
                     else{
-                        doublons.add(annotation.value());
+                        Exception e = new Exception("Url deja present pour un autre fonction");
+                        throw e;
                     }
                 }
             }
         }
-        return doublons;
     }
 
     public static int urlAlreadyExist (Map<String , Mapping> annotedGetFunction , String url){
@@ -77,16 +77,16 @@ public class Utils {
         return 0;
     }
 
-    public static Object callFunction(Mapping map){
+    public static Object callFunction(Mapping map , HttpSession httpSession){
         Object returned = null;
         try {
             Class<?> classe = Class.forName(map.getClassName());
-            Object obj = classe.newInstance();
-            // Method method = obj.getClass().getDeclaredMethod(map.getFunctionName() , null);
-            Method method = (Method)determineMethod(map);
+            Object obj = classe.getDeclaredConstructor().newInstance();
+            Method method = (Method)determineMethod(map , httpSession);
 
             if(method.getParameterCount()==0){
-                returned = method.invoke(obj, null);
+                Object parameter = null;
+                returned = method.invoke(obj, parameter);
             }
             else{
                 returned = method;
@@ -97,11 +97,11 @@ public class Utils {
         return returned;
     }
 
-    public static Object determineMethod(Mapping map){
+    public static Object determineMethod(Mapping map , HttpSession httpSession){
         Object returned = null;
         try{
             Class<?> classe = Class.forName(map.getClassName());
-            Object obj = classe.newInstance();
+            Object obj = classe.getDeclaredConstructor().newInstance();
             Method[] methods = obj.getClass().getDeclaredMethods();
             for(int i=0 ; i<methods.length ; i++){
                 if(methods[i].getName().equals(map.getFunctionName())){
@@ -135,20 +135,24 @@ public class Utils {
                 if(parameterNames[i].isAnnotationPresent(Param.class)){
                     Param annotation = parameterNames[i].getAnnotation(Param.class);
                     nom = annotation.value();
+                    Class<?> obj = parameterNames[i].getType();
+                    Field[] attributs = obj.getDeclaredFields();
+                    for(int j=0 ; j<attributs.length ; j++){
+                        if(attributs[j].isAnnotationPresent(NameField.class)){
+                            NameField annotationField = attributs[j].getAnnotation(NameField.class);
+                            names.add(nom+"."+annotationField.value());
+                        }
+                        else{
+                            names.add(nom+"."+attributs[j].getName());
+                        }
+                    }
                 }
                 else{
-                    Exception e = new Exception("ETU 002362 : L'argument nomme "+nom+" n'est pas annote");
-                    throw e;
-                }
-                Class<?> obj = parameterNames[i].getType();
-                Field[] attributs = obj.getDeclaredFields();
-                for(int j=0 ; j<attributs.length ; j++){
-                    if(attributs[j].isAnnotationPresent(NameField.class)){
-                        NameField annotation = attributs[j].getAnnotation(NameField.class);
-                        names.add(nom+"."+annotation.value());
-                    }
-                    else{
-                        names.add(nom+"."+attributs[j].getName());
+                    if(parameterNames[i].getType()==CustomSession.class){
+                        names.add("Session Traitement");
+                    }else{
+                        Exception e = new Exception("ETU 002362 : L'argument nomme "+nom+" n'est pas annote");
+                        throw e;
                     }
                 }
             }
@@ -156,11 +160,30 @@ public class Utils {
         return names;
     }
 
-    public static Object callFunction2(Mapping map , Method method , ArrayList<String> requestValue)throws Exception{
+    public static Object callFunction2(Mapping map , Method method , ArrayList<String> requestValue , HttpSession httpSession)throws Exception{
         Object returned = null;
         Object[] parameters = castToRigthType(method, requestValue);
         Class<?> classe = Class.forName(map.getClassName());
-        Object obj = classe.newInstance();
+        Object obj = classe.getDeclaredConstructor().newInstance();
+        Parameter[] types = method.getParameters();
+        for(int i=0 ; i<types.length ; i++){
+            if(types[i].getType()==CustomSession.class){
+                parameters[i] = new CustomSession(httpSession);
+                break;
+            }
+        }
+        
+        Field[] attributs = obj.getClass().getDeclaredFields();
+        for(Field attribut : attributs){
+            if(attribut.getType()==CustomSession.class){
+                CustomSession session = new CustomSession(httpSession);
+                attribut.setAccessible(true);
+                
+                attribut.set(obj, session);
+                attribut.setAccessible(false);
+            }
+        }
+
         returned = method.invoke(obj, parameters);
         return returned;
     }
@@ -192,19 +215,24 @@ public class Utils {
                 indArg++;
             }else{
                 Class<?> obj = parameterTypes[indArg];
-                Object obj2 = obj.newInstance();
-                Field[] attributs = obj.getDeclaredFields();
-                Object[] attributValues = new Object[attributs.length];
-                for(int j=0 ; j<attributs.length ; j++){
-                    attributValues[j] = caster(requestValue.get(i), attributs[j].getType().getSimpleName());
-                    i++;
-                }
+                Object obj2 = obj.getDeclaredConstructor().newInstance();
+                if(obj != CustomSession.class){
+                    Field[] attributs = obj.getDeclaredFields();
+                    Object[] attributValues = new Object[attributs.length];
+                    for(int j=0 ; j<attributs.length ; j++){
+                        attributValues[j] = caster(requestValue.get(i), attributs[j].getType().getSimpleName());
+                        i++;
+                    }
 
-                obj2 = process(obj2 , attributValues);
-                objs[indArg] = obj2;
-                indArg++;
-                if(attributs.length>0){
-                    i--;
+                    obj2 = process(obj2 , attributValues);
+                    objs[indArg] = obj2;
+                    indArg++;
+                    if(attributs.length>0){
+                        i--;
+                    }
+                }else{
+                    objs[indArg] = null;
+                    indArg++;
                 }
             }
 
@@ -225,6 +253,7 @@ public class Utils {
             }else{
                 attribut.set(object, null);
             }
+            attribut.setAccessible(false);
         }
 
         return object;
