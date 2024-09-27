@@ -77,22 +77,28 @@ public class Utils {
         return 0;
     }
 
-    public static Object callFunction(Mapping map , HttpSession httpSession){
-        Object returned = null;
+    public static Method callFunction(Mapping map , HttpSession httpSession){
+        Method returned = null;
         try {
-            Class<?> classe = Class.forName(map.getClassName());
-            Object obj = classe.getDeclaredConstructor().newInstance();
             Method method = (Method)determineMethod(map , httpSession);
 
-            if(method.getParameterCount()==0){
-                Object parameter = null;
-                returned = method.invoke(obj, parameter);
-            }
-            else{
-                returned = method;
-            }
+            returned = method;
         } catch (Exception e) {
             
+        }
+        return returned;
+    }
+
+    public static Object executeFunctionWithNoArgument(Mapping map, Method method){
+        Object returned = null;
+        try{
+            Class<?> classe = Class.forName(map.getClassName());
+            Object obj = classe.getDeclaredConstructor().newInstance();
+
+            returned = method.invoke(obj, null);
+        }
+        catch(Exception e){
+
         }
         return returned;
     }
