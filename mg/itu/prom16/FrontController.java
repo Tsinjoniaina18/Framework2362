@@ -5,7 +5,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
-
+import mg.itu.prom16.annotation.RestAPI;
 import mg.itu.prom16.mapping.Mapping;
 import mg.itu.prom16.mapping.ModelView;
 import mg.itu.prom16.mapping.Utils;
@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.lang.reflect.Method;
+
+import com.google.gson.Gson;
 
 public class FrontController extends HttpServlet{
     private String controllerPackage;
@@ -34,7 +36,7 @@ public class FrontController extends HttpServlet{
     }
 
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException{
-        res.setContentType("text/html");
+        res.setContentType("text/json");
         PrintWriter out = res.getWriter();
         out.println("servlet post");
 
@@ -42,7 +44,7 @@ public class FrontController extends HttpServlet{
     }
 
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException{
-        res.setContentType("text/html");
+        res.setContentType("text/json");
         PrintWriter out = res.getWriter();
         out.println("servlet get");
 
@@ -50,7 +52,7 @@ public class FrontController extends HttpServlet{
     }
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException{
-        res.setContentType("text/html");
+        res.setContentType("text/json");
         PrintWriter out = res.getWriter();
 
         if(this.error == 1){
@@ -66,25 +68,39 @@ public class FrontController extends HttpServlet{
             String[] urlSplited = url.split(slach);
             Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
             if(map != null){
-
-                Object returned = Utils.callFunction(map , req.getSession());
-                if(returned instanceof java.lang.String){
-                    out.println("Valeur de retour : "+returned);
+                Gson gson = new Gson();
+                Method method = Utils.callFunction(map , req.getSession());
+                if(method.getParameterCount()==0){
+                    Object returned = Utils.executeFunctionWithNoArgument(map, method);
+                    if(returned instanceof java.lang.String){
+                        if(method.isAnnotationPresent(RestAPI.class)){
+                            returned = gson.toJson(returned);
+                        }
+                        out.println("Valeur de retour : "+returned);
+                    }
+                    else if(returned instanceof mg.itu.prom16.mapping.ModelView){
+                        ModelView mv = (ModelView)returned;
+                        if(method.isAnnotationPresent(RestAPI.class)){
+                            String json = gson.toJson(mv.getObject());
+                            out.println(json);
+                        }
+                        else{
+                            mv.getObject().forEach(
+                                (cle , valeur)->req.setAttribute(cle , valeur)
+                            );
+        
+                            RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
+                            dispat.forward(req,res);
+                        }
+                    }    
+                    else{
+                        String title = "Error 1802: Invalid return value";
+                        String cause = "Get Funtion must return String or ModelView";
+                        String error = Utils.ErrorPage(title, cause);
+                        out.println(error);
+                    }
                 }
-                else if(returned instanceof mg.itu.prom16.mapping.ModelView){
-
-                    ModelView mv = (ModelView)returned;
-
-                    mv.getObject().forEach(
-                        (cle , valeur)->req.setAttribute(cle , valeur)
-                    );
-
-                    RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
-                    dispat.forward(req,res);
-
-                }
-                else if(returned instanceof java.lang.reflect.Method){
-                    Method method = (Method) returned;
+                else{
                     ArrayList<String> parameterNames = new ArrayList<String>();
                     try{
                         parameterNames = Utils.parameterNames(method);
@@ -106,21 +122,21 @@ public class FrontController extends HttpServlet{
                     }
                     try{
                         ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues , req.getSession(false));
-                        mv.getObject().forEach(
-                            (cle , valeur)->req.setAttribute(cle , valeur)
-                        );
+                        if(method.isAnnotationPresent(RestAPI.class)){
+                            String json = gson.toJson(mv.getObject());
+                            out.println(json);
+                        }
+                        else{
+                            mv.getObject().forEach(
+                                (cle , valeur)->req.setAttribute(cle , valeur)
+                            );
 
-                        RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
-                        dispat.forward(req,res);
+                            RequestDispatcher dispat = req.getRequestDispatcher(mv.getUrl());
+                            dispat.forward(req,res);
+                        }
                     }catch(Exception e){
                         out.print(e);
                     }
-                }
-                else{
-                    String title = "Error 1802: Invalid return value";
-                    String cause = "Get Funtion must return String or ModelView";
-                    String error = Utils.ErrorPage(title, cause);
-                    out.println(error);
                 }
             }else {
                 out.print("Aucune fonction correspondante");
