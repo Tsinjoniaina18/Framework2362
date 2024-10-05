@@ -54,6 +54,8 @@ public class FrontController extends HttpServlet{
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException{
         res.setContentType("text/json");
         PrintWriter out = res.getWriter();
+        
+        out.println(req.getMethod());
 
         if(this.error == 1){
             out.print(Utils.ErrorPage("Error 405: Url forbidden", "One root already exist and must be declared once"));
@@ -70,6 +72,13 @@ public class FrontController extends HttpServlet{
             if(map != null){
                 Gson gson = new Gson();
                 Method method = Utils.callFunction(map , req.getSession());
+
+                out.println(map.getVerb());
+                if(!req.getMethod().equals(map.getVerb())){
+                    out.print(Utils.ErrorPage("Error 2362: Invalid Method", "Invalid method, it does not match"));
+                    return;
+                }
+
                 if(method.getParameterCount()==0){
                     Object returned = Utils.executeFunctionWithNoArgument(map, method);
                     if(returned instanceof java.lang.String){
