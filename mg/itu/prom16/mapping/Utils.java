@@ -11,8 +11,10 @@ import java.util.Map;
 import jakarta.servlet.http.HttpSession;
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
+import mg.itu.prom16.annotation.Url;
 import mg.itu.prom16.annotation.NameField;
 import mg.itu.prom16.annotation.Param;
+import mg.itu.prom16.annotation.Post;
 
 public class Utils {
     public static ArrayList<String> allControlerName (String controllerPackage){
@@ -48,14 +50,24 @@ public class Utils {
 
     public static void allAnnotedGetFunction (Map<String , Mapping> annotedGetFunction , String controllerPackage)throws Exception{
         ArrayList<String> listControler = allControlerName(controllerPackage);
+        String verb = "";
         for(int i=0 ; i<listControler.size() ; i++){
             Class<?> controler = Class.forName(listControler.get(i));
             Object obj = controler.getDeclaredConstructor().newInstance();
             Method[] method = obj.getClass().getDeclaredMethods();
             for(int j=0 ; j<method.length ; j++){
-                if(method[j].isAnnotationPresent(Get.class)){
-                    Mapping map = new Mapping(listControler.get(i) , method[j].getName());
-                    Get annotation = method[j].getAnnotation(Get.class);
+                if(method[j].isAnnotationPresent(Url.class)){
+                    if(!method[j].isAnnotationPresent(Post.class) && !method[j].isAnnotationPresent(Get.class)){
+                        verb = "GET";
+                    }else {
+                        if (method[j].isAnnotationPresent(Post.class)){
+                            verb = "POST";
+                        }else{
+                            verb = "GET";
+                        }
+                    }
+                    Mapping map = new Mapping(listControler.get(i) , method[j].getName(), verb);
+                    Url annotation = method[j].getAnnotation(Url.class);
                     if(urlAlreadyExist(annotedGetFunction, annotation.value()) == 0){
                         annotedGetFunction.put(annotation.value(), map);
                     }
