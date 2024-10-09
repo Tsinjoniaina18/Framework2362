@@ -8,6 +8,9 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Map;
 
+import com.mysql.cj.exceptions.ExceptionFactory;
+
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
@@ -66,14 +69,23 @@ public class Utils {
                             verb = "GET";
                         }
                     }
-                    Mapping map = new Mapping(listControler.get(i) , method[j].getName(), verb);
+                    Mapping map = new Mapping();
+                    ClassMethod classMethod = new ClassMethod(listControler.get(i) , method[j].getName(), verb);
+
                     Url annotation = method[j].getAnnotation(Url.class);
                     if(urlAlreadyExist(annotedGetFunction, annotation.value()) == 0){
+                        map.addClassMethod(classMethod);
                         annotedGetFunction.put(annotation.value(), map);
                     }
                     else{
-                        Exception e = new Exception("Url deja present pour un autre fonction");
-                        throw e;
+                        Mapping temp = annotedGetFunction.get(annotation.value());
+                        if(temp.classMethodByVerb(verb)!=null){
+                            throw new Exception("Method "+verb+" already exist on the Url '"+annotation.value()+"'");
+                        }
+                        temp.addClassMethod(classMethod);
+                        annotedGetFunction.replace(annotation.value(), temp);
+                        /*Exception e = new Exception("Url deja present pour un autre fonction");
+                        throw e;*/
                     }
                 }
             }
@@ -89,10 +101,10 @@ public class Utils {
         return 0;
     }
 
-    public static Method callFunction(Mapping map , HttpSession httpSession){
+    public static Method callFunction(Mapping map , HttpSession httpSession, HttpServletRequest request){
         Method returned = null;
         try {
-            Method method = (Method)determineMethod(map , httpSession);
+            Method method = (Method)determineMethod(map , httpSession, request);
 
             returned = method;
         } catch (Exception e) {
@@ -101,30 +113,36 @@ public class Utils {
         return returned;
     }
 
-    public static Object executeFunctionWithNoArgument(Mapping map, Method method){
+    public static Object executeFunctionWithNoArgument(Mapping map, Method method, HttpServletRequest request){
         Object returned = null;
         try{
-            Class<?> classe = Class.forName(map.getClassName());
+            String verb = request.getMethod();
+            ClassMethod classMethod = map.classMethodByVerb(verb);
+
+            Class<?> classe = Class.forName(classMethod.getClassName());
             Object obj = classe.getDeclaredConstructor().newInstance();
 
             returned = method.invoke(obj, null);
         }
         catch(Exception e){
-
+            System.out.println(e);
         }
         return returned;
     }
 
-    public static Object determineMethod(Mapping map , HttpSession httpSession){
+    public static Object determineMethod(Mapping map, HttpSession httpSession, HttpServletRequest request){
         Object returned = null;
         try{
-            Class<?> classe = Class.forName(map.getClassName());
+            String verb = request.getMethod();
+            ClassMethod classMethod = map.classMethodByVerb(verb);
+
+            Class<?> classe = Class.forName(classMethod.getClassName());
             Object obj = classe.getDeclaredConstructor().newInstance();
             Method[] methods = obj.getClass().getDeclaredMethods();
             for(int i=0 ; i<methods.length ; i++){
-                if(methods[i].getName().equals(map.getFunctionName())){
+                if(methods[i].getName().equals(classMethod.getFunctionName())){
                     Class<?>[] parameterTypes = methods[i].getParameterTypes();
-                    returned = obj.getClass().getDeclaredMethod(map.getFunctionName(), parameterTypes);
+                    returned = obj.getClass().getDeclaredMethod(classMethod.getFunctionName(), parameterTypes);
                     break;
                 }
             }
@@ -178,10 +196,13 @@ public class Utils {
         return names;
     }
 
-    public static Object callFunction2(Mapping map , Method method , ArrayList<String> requestValue , HttpSession httpSession)throws Exception{
+    public static Object callFunction2(Mapping map , Method method , ArrayList<String> requestValue , HttpSession httpSession, HttpServletRequest request)throws Exception{
+        String verb = request.getMethod();
+        ClassMethod classMethod = map.classMethodByVerb(verb);
+
         Object returned = null;
         Object[] parameters = castToRigthType(method, requestValue);
-        Class<?> classe = Class.forName(map.getClassName());
+        Class<?> classe = Class.forName(classMethod.getClassName());
         Object obj = classe.getDeclaredConstructor().newInstance();
         Parameter[] types = method.getParameters();
         for(int i=0 ; i<types.length ; i++){

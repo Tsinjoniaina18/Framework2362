@@ -1,41 +1,32 @@
 package mg.itu.prom16.mapping;
 
-public class Mapping {
-    private String className;
-    private String functionName;
-    private String verb;
+import java.util.ArrayList;
 
-    public Mapping(String c , String function, String verb){
-        this.setClassName(c);
-        this.setFunctionName(function);
-        this.setVerb(verb);
-    }
+public class Mapping {
+    private ArrayList<ClassMethod> classMethod;
 
     public Mapping(){
-
+        this.classMethod = new ArrayList<ClassMethod>();
     }
 
-    public String getClassName(){
-        return this.className;
+    public ArrayList<ClassMethod> getClassMethod(){
+        return this.classMethod;
     }
 
-    public String getFunctionName(){
-        return this.functionName;
+    public void setClassMethod(ArrayList<ClassMethod> classMethod){
+        this.classMethod = classMethod;
     }
 
-    public void setClassName(String c){
-        this.className = c;
+    public void addClassMethod(ClassMethod classMethod){
+        this.getClassMethod().add(classMethod);
     }
 
-    public void setFunctionName(String f){
-        this.functionName = f;
-    }
-
-    public String getVerb(){
-        return this.verb;
-    }
-
-    public void setVerb(String s){
-        this.verb = s;
+    public ClassMethod classMethodByVerb(String verb){
+        for(int i=0 ; i<this.getClassMethod().size() ; i++){
+            if(this.getClassMethod().get(i).getVerb().equals(verb)){
+                return this.getClassMethod().get(i);
+            }
+        }
+        return null;
     }
 }
