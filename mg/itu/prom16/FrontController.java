@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
 import mg.itu.prom16.annotation.RestAPI;
+import mg.itu.prom16.mapping.ClassMethod;
 import mg.itu.prom16.mapping.Mapping;
 import mg.itu.prom16.mapping.ModelView;
 import mg.itu.prom16.mapping.Utils;
@@ -21,7 +22,7 @@ import com.google.gson.Gson;
 
 public class FrontController extends HttpServlet{
     private String controllerPackage;
-    private int error = 0;
+    private String error = "";
     private Map<String , Mapping> annotedGetFunction = new HashMap<>();
 
     public void init ()throws ServletException{
@@ -31,7 +32,7 @@ public class FrontController extends HttpServlet{
             Utils.allAnnotedGetFunction(this.annotedGetFunction , this.controllerPackage);
         }
         catch(Exception e){
-            this.error = 1;
+           this.error += e.getMessage();
         }
     }
 
@@ -57,8 +58,8 @@ public class FrontController extends HttpServlet{
         
         out.println(req.getMethod());
 
-        if(this.error == 1){
-            out.print(Utils.ErrorPage("Error 405: Url forbidden", "One root already exist and must be declared once"));
+        if(!this.error.equals("")){
+            out.print(Utils.ErrorPage("Error 500: Scan Error", "Error when scan all project because of "+this.error+" !"));
 
             return;
         }
@@ -70,17 +71,20 @@ public class FrontController extends HttpServlet{
             String[] urlSplited = url.split(slach);
             Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
             if(map != null){
-                Gson gson = new Gson();
-                Method method = Utils.callFunction(map , req.getSession());
+                // out.println(map.getVerb());
+                String verb = req.getMethod();
+                ClassMethod classMethod = map.classMethodByVerb(verb);
 
-                out.println(map.getVerb());
-                if(!req.getMethod().equals(map.getVerb())){
-                    out.print(Utils.ErrorPage("Error 2362: Invalid Method", "Invalid method, it does not match"));
+                if(classMethod == null){
+                    out.print(Utils.ErrorPage("Error 500: Invalid Method", "Invalid method, it does not match or does not exist"));
                     return;
                 }
 
+                Gson gson = new Gson();
+                Method method = Utils.callFunction(map , req.getSession(), req);
+
                 if(method.getParameterCount()==0){
-                    Object returned = Utils.executeFunctionWithNoArgument(map, method);
+                    Object returned = Utils.executeFunctionWithNoArgument(map, method, req);
                     if(returned instanceof java.lang.String){
                         if(method.isAnnotationPresent(RestAPI.class)){
                             returned = gson.toJson(returned);
@@ -130,7 +134,7 @@ public class FrontController extends HttpServlet{
                         }
                     }
                     try{
-                        ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues , req.getSession(false));
+                        ModelView mv = (ModelView)Utils.callFunction2(map , method , requestValues , req.getSession(false), req);
                         if(method.isAnnotationPresent(RestAPI.class)){
                             String json = gson.toJson(mv.getObject());
                             out.println(json);
