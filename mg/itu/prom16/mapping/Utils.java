@@ -300,17 +300,9 @@ public class Utils {
 
     public static String ErrorPage(String title , String cause){
         String val = "";
-        val += "<html>";
-        val += "<head>";
-        val += "<title>Error Framework 2362</title>";
-        val += "</head>";    
-        val += "<body>";
-
+        val += "Erreur : ";
         val += "<h1>"+title+"</h1>";
         val += "<h3>"+cause+"</h3>";
-
-        val += "</body>";
-        val += "</html>";
         return val;
     }
 }

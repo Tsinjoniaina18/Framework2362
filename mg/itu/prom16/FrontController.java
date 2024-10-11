@@ -59,6 +59,12 @@ public class FrontController extends HttpServlet{
         out.println(req.getMethod());
 
         if(!this.error.equals("")){
+            
+            req.setAttribute("error", Utils.ErrorPage("Error 500: Scan Error", "Error when scan all project because of "+this.error+" !"));
+
+            RequestDispatcher dispatch = req.getRequestDispatcher("error/error.jsp");
+            dispatch.forward(req, res);
+            
             out.print(Utils.ErrorPage("Error 500: Scan Error", "Error when scan all project because of "+this.error+" !"));
 
             return;
