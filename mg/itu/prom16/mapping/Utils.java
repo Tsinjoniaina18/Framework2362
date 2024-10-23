@@ -1,6 +1,9 @@
 package mg.itu.prom16.mapping;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -12,6 +15,7 @@ import com.mysql.cj.exceptions.ExceptionFactory;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Part;
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
 import mg.itu.prom16.annotation.Url;
@@ -152,14 +156,17 @@ public class Utils {
         return returned;
     }
 
-    public static ArrayList<String> parameterNames(Method method) throws Exception{
+    public static Object[] parameterNames(Method method, HttpServletRequest request) throws Exception{
         Parameter[] parameterNames = method.getParameters();
-        ArrayList<String> names = new ArrayList<String>();
+        Object[] parameterValues = new Object[parameterNames.length];
+        String requestValue;
         for(int i=0 ; i<parameterNames.length ; i++){
             if(parameterNames[i].getType().isPrimitive() || parameterNames[i].getType()==String.class){
                 if(parameterNames[i].isAnnotationPresent(Param.class)){
                     Param annotation = parameterNames[i].getAnnotation(Param.class);
-                    names.add(annotation.value());
+
+                    requestValue = request.getParameter(annotation.value());
+                    parameterValues[i] = caster(requestValue, parameterNames[i].getType().getSimpleName());
                 }else{
                     // names.add(parameterNames[i].getName());
                     Exception e = new Exception("ETU 002362 : L'argument nomme "+parameterNames[i].getName()+" n'est pas annote");
@@ -167,41 +174,65 @@ public class Utils {
                 }
             }
             else{
+
                 String nom = parameterNames[i].getName();
+                String requestName;
+                Class<?> parameterClass = parameterNames[i].getType();
+                Object obj = parameterClass.getDeclaredConstructor().newInstance();
+
                 if(parameterNames[i].isAnnotationPresent(Param.class)){
                     Param annotation = parameterNames[i].getAnnotation(Param.class);
                     nom = annotation.value();
-                    Class<?> obj = parameterNames[i].getType();
-                    Field[] attributs = obj.getDeclaredFields();
+
+                    Field[] attributs = parameterClass.getDeclaredFields();
+                    Object[] attributsValue = new Object[attributs.length];
+
                     for(int j=0 ; j<attributs.length ; j++){
+                        int type = 0;
                         if(attributs[j].isAnnotationPresent(NameField.class)){
                             NameField annotationField = attributs[j].getAnnotation(NameField.class);
-                            names.add(nom+"."+annotationField.value());
+                            requestName = nom+"."+annotationField.value();
+                            if(annotationField.file()){
+                                type = 1;
+                            }
                         }
                         else{
-                            names.add(nom+"."+attributs[j].getName());
+                            requestName = nom+"."+attributs[j].getName();
                         }
+
+                        if(type == 0){
+                            requestValue = request.getParameter(requestName);
+                            attributsValue[j] = caster(requestValue, attributs[j].getType().getSimpleName());
+                        }else if(type == 1){
+                            Part part = request.getPart(requestName);
+                            if(attributs[j].getType().getSimpleName().equals("String")){
+                                attributsValue[j] = fileName(part);
+                            }else if(attributs[j].getType().isArray()){
+                                attributsValue[j] = fileBytes(part);
+                            }
+                        }
+
                     }
+
+                    obj = process(obj, attributsValue);
+                    parameterValues[i] = obj;
                 }
                 else{
-                    if(parameterNames[i].getType()==CustomSession.class){
-                        names.add("Session Traitement");
-                    }else{
+                    if(parameterNames[i].getType()!=CustomSession.class){
                         Exception e = new Exception("ETU 002362 : L'argument nomme "+nom+" n'est pas annote");
                         throw e;
                     }
                 }
             }
         }
-        return names;
+        return parameterValues;
     }
 
-    public static Object callFunction2(Mapping map , Method method , ArrayList<String> requestValue , HttpSession httpSession, HttpServletRequest request)throws Exception{
+    public static Object callFunction2(Mapping map , Method method , Object[] parameters , HttpSession httpSession, HttpServletRequest request)throws Exception{
         String verb = request.getMethod();
         ClassMethod classMethod = map.classMethodByVerb(verb);
 
         Object returned = null;
-        Object[] parameters = castToRigthType(method, requestValue);
         Class<?> classe = Class.forName(classMethod.getClassName());
         Object obj = classe.getDeclaredConstructor().newInstance();
         Parameter[] types = method.getParameters();
@@ -243,42 +274,6 @@ public class Utils {
         return data;
     }
 
-    public static Object[] castToRigthType(Method method , ArrayList<String> requestValue)throws Exception{
-        Object[] objs = new Object[method.getParameterTypes().length];
-        Class<?>[] parameterTypes = method.getParameterTypes();
-        int indArg = 0;
-        for(int i = 0 ; i<requestValue.size() ; i++){
-
-            if(parameterTypes[indArg].isPrimitive() || parameterTypes[indArg] == String.class){
-                objs[indArg] = caster(requestValue.get(i) , parameterTypes[indArg].getSimpleName());
-                indArg++;
-            }else{
-                Class<?> obj = parameterTypes[indArg];
-                Object obj2 = obj.getDeclaredConstructor().newInstance();
-                if(obj != CustomSession.class){
-                    Field[] attributs = obj.getDeclaredFields();
-                    Object[] attributValues = new Object[attributs.length];
-                    for(int j=0 ; j<attributs.length ; j++){
-                        attributValues[j] = caster(requestValue.get(i), attributs[j].getType().getSimpleName());
-                        i++;
-                    }
-
-                    obj2 = process(obj2 , attributValues);
-                    objs[indArg] = obj2;
-                    indArg++;
-                    if(attributs.length>0){
-                        i--;
-                    }
-                }else{
-                    objs[indArg] = null;
-                    indArg++;
-                }
-            }
-
-        }
-        return objs;
-    }
-
     public static <T> T process(T object , Object[] attributValues)throws Exception{
         Class<?> clazz = object.getClass();
         Field[] attributs = clazz.getDeclaredFields();
@@ -298,11 +293,33 @@ public class Utils {
         return object;
     }
 
+    public static String fileName(Part part){
+        String contentDisp = part.getHeader("content-disposition");
+        String[] tokens = contentDisp.split(";");
+        for(String token : tokens){
+            if(token.trim().startsWith("filename")){
+                return token.substring(token.indexOf("=")+1, token.length());
+            }
+        }
+        return "";
+    }
+
+    public static byte[] fileBytes(Part part) throws IOException{
+        InputStream inputStream = part.getInputStream();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int n = 0;
+        while (-1 != (n = inputStream.read(buffer))) {
+            outputStream.write(buffer, 0, n);
+        }
+        return outputStream.toByteArray();
+    }
+
     public static String ErrorPage(String title , String cause){
         String val = "";
         val += "Erreur : ";
-        val += "<h1>"+title+"</h1>";
-        val += "<h3>"+cause+"</h3>";
+        val += "Title : "+title+" ";
+        val += "Cause : "+cause;
         return val;
     }
 }
