@@ -61,7 +61,7 @@ public class Validator {
                 throw new Exception("The field '" + attribut.getName() + "' is not a valid email address: " + email);
             }
         } else {
-            throw new Exception("The field '" + attribut.getName() + "' must be a String containing a valid email address");
+            throw new Exception("The field '" + attribut.getName() + "' should be a String containing a valid email address");
         }
     }
 
