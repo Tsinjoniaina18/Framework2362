@@ -8,10 +8,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Map;
-
-import com.mysql.cj.exceptions.ExceptionFactory;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -19,6 +18,7 @@ import jakarta.servlet.http.Part;
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
 import mg.itu.prom16.annotation.Url;
+import mg.itu.prom16.mapping.utils.Validator;
 import mg.itu.prom16.annotation.NameField;
 import mg.itu.prom16.annotation.Param;
 import mg.itu.prom16.annotation.Post;
@@ -166,7 +166,7 @@ public class Utils {
                     Param annotation = parameterNames[i].getAnnotation(Param.class);
 
                     requestValue = request.getParameter(annotation.value());
-                    parameterValues[i] = caster(requestValue, parameterNames[i].getType().getSimpleName());
+                    parameterValues[i] = caster(requestValue, parameterNames[i].getType().getName());
                 }else{
                     // names.add(parameterNames[i].getName());
                     Exception e = new Exception("ETU 002362 : L'argument nomme "+parameterNames[i].getName()+" n'est pas annote");
@@ -201,15 +201,21 @@ public class Utils {
                         }
 
                         if(type == 0){
+
                             requestValue = request.getParameter(requestName);
-                            attributsValue[j] = caster(requestValue, attributs[j].getType().getSimpleName());
+                            attributsValue[j] = caster(requestValue, attributs[j].getType().getName());
+                            attributsValue[j] = Validator.validation(attributs[j], attributsValue[j]);
+                            System.out.println("Validee");
+
                         }else if(type == 1){
+
                             Part part = request.getPart(requestName);
                             if(attributs[j].getType().getSimpleName().equals("String")){
                                 attributsValue[j] = fileName(part);
                             }else if(attributs[j].getType().isArray()){
                                 attributsValue[j] = fileBytes(part);
                             }
+
                         }
 
                     }
@@ -258,9 +264,12 @@ public class Utils {
         return returned;
     }
 
-    public static Object caster (String data , String type){
-        if(data==null){
-            return 0;    
+    public static Object caster (String data , String type) throws Exception {
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+        if(data==null || data.equals("")){
+            return null;    
         }
         if(type.equalsIgnoreCase("int")){
             return Integer.parseInt(data);
@@ -271,6 +280,16 @@ public class Utils {
         else if(type.equalsIgnoreCase("long")){
             return Long.parseLong(data);
         }
+        else if(type.equalsIgnoreCase("float")){
+            return Float.parseFloat(data);
+        }
+        else if(type.equalsIgnoreCase("java.util.Date")){
+            return sdf.parse(data);
+        }
+        else if(type.equalsIgnoreCase("java.sql.Date")){
+            return new java.sql.Date(sdf.parse(data).getTime());
+        }
+
         return data;
     }
 
