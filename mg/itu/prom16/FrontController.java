@@ -74,7 +74,6 @@ public class FrontController extends HttpServlet{
             String[] urlSplited = url.split(slach);
             Mapping map = annotedGetFunction.get(urlSplited[urlSplited.length-1]);  
             if(map != null){
-                // out.println(map.getVerb());
                 String verb = req.getMethod();
                 ClassMethod classMethod;
                 classMethod = map.classMethodByVerb(verb);
