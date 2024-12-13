@@ -38,10 +38,10 @@ public class Validator {
         if (value instanceof java.util.Date) {
             SimpleDateFormat sdf = new SimpleDateFormat(format);
 
-            System.out.println("Avant : "+(java.util.Date) value);
+            // System.out.println("Avant : "+(java.util.Date) value);
 
             String formattedDate = sdf.format((java.util.Date) value);
-            System.out.println("Apres : "+formattedDate);
+            // System.out.println("Apres : "+formattedDate);
 
             if (value instanceof java.sql.Date) {
                 java.sql.Date sqlDate = new java.sql.Date(sdf.parse(formattedDate).getTime());

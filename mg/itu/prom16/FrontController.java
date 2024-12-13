@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.annotation.MultipartConfig;
+import mg.itu.prom16.annotation.Post;
 import mg.itu.prom16.annotation.RestAPI;
 import mg.itu.prom16.mapping.ClassMethod;
 import mg.itu.prom16.mapping.Mapping;
@@ -51,12 +52,13 @@ public class FrontController extends HttpServlet{
         out.println("servlet get");
 
         processRequest(req, res);
-    }
+    } 
+    // value="<%= request.getAttribute("email") != null ? request.getAttribute("email") : "" %>"
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException{
         res.setContentType("text/json");
         PrintWriter out = res.getWriter();
-        
+
         out.println(req.getMethod());
 
         if(!this.error.equals("")){
@@ -74,7 +76,12 @@ public class FrontController extends HttpServlet{
             if(map != null){
                 // out.println(map.getVerb());
                 String verb = req.getMethod();
-                ClassMethod classMethod = map.classMethodByVerb(verb);
+                ClassMethod classMethod;
+                classMethod = map.classMethodByVerb(verb);
+                if(classMethod == null && req.getAttribute("error")!=null){
+                    verb = "GET";
+                    classMethod = map.classMethodByVerb(verb);
+                }
 
                 if(classMethod == null){
                     out.print(Utils.ErrorPage("Error 500: Invalid Method", "Invalid method, it does not match or does not exist"));
@@ -118,6 +125,13 @@ public class FrontController extends HttpServlet{
                     Object[] parameterValues;
                     try{
                         parameterValues = Utils.parameterNames(method, req);
+                        if(req.getAttribute("error")!=null){
+                            ModelView mv = (ModelView)Utils.callFunction2(map , method , parameterValues , req.getSession(false), req);
+                            String origine = mv.getError();
+
+                            RequestDispatcher dispatcher = req.getRequestDispatcher(origine);
+                            dispatcher.forward(req, res);
+                        }
                     }catch(Exception e){
                         String title = "Error 2362";
                         String cause = e.getMessage();

@@ -121,6 +121,9 @@ public class Utils {
         Object returned = null;
         try{
             String verb = request.getMethod();
+            if(request.getAttribute("error")!=null){
+                verb = "GET";
+            }
             ClassMethod classMethod = map.classMethodByVerb(verb);
 
             Class<?> classe = Class.forName(classMethod.getClassName());
@@ -138,6 +141,9 @@ public class Utils {
         Object returned = null;
         try{
             String verb = request.getMethod();
+            if(request.getAttribute("error")!=null){
+                verb = "GET";
+            }
             ClassMethod classMethod = map.classMethodByVerb(verb);
 
             Class<?> classe = Class.forName(classMethod.getClassName());
@@ -160,6 +166,7 @@ public class Utils {
         Parameter[] parameterNames = method.getParameters();
         Object[] parameterValues = new Object[parameterNames.length];
         String requestValue;
+        ArrayList<String> errors = new ArrayList<String>();
         for(int i=0 ; i<parameterNames.length ; i++){
             if(parameterNames[i].getType().isPrimitive() || parameterNames[i].getType()==String.class){
                 if(parameterNames[i].isAnnotationPresent(Param.class)){
@@ -187,6 +194,8 @@ public class Utils {
                     Field[] attributs = parameterClass.getDeclaredFields();
                     Object[] attributsValue = new Object[attributs.length];
 
+                    int error = 0;
+
                     for(int j=0 ; j<attributs.length ; j++){
                         int type = 0;
                         if(attributs[j].isAnnotationPresent(NameField.class)){
@@ -204,8 +213,12 @@ public class Utils {
 
                             requestValue = request.getParameter(requestName);
                             attributsValue[j] = caster(requestValue, attributs[j].getType().getName());
-                            attributsValue[j] = Validator.validation(attributs[j], attributsValue[j]);
-                            System.out.println("Validee");
+                            try{
+                                attributsValue[j] = Validator.validation(attributs[j], attributsValue[j]);
+                            }catch(Exception e){
+                                errors.add(e.getMessage());
+                                error ++;
+                            }
 
                         }else if(type == 1){
 
@@ -220,6 +233,17 @@ public class Utils {
 
                     }
 
+                    if (error>0) {
+
+                        request.setAttribute("error", errors);
+                        if(method.isAnnotationPresent(Get.class)){
+                            request.setAttribute("method", "GET");
+                        }else if(method.isAnnotationPresent(Post.class)){
+                            request.setAttribute("method", "POST");
+                        }
+
+                        setAttributeError(parameterNames[i], attributsValue, request);
+                    }
                     obj = process(obj, attributsValue);
                     parameterValues[i] = obj;
                 }
@@ -234,8 +258,36 @@ public class Utils {
         return parameterValues;
     }
 
+    public static void setAttributeError(Parameter parameter, Object[] attributsValue, HttpServletRequest request)throws Exception{
+        String nom = parameter.getName();
+        String requestName;
+        Class<?> parameterClass = parameter.getType();
+
+        if(parameter.isAnnotationPresent(Param.class)){
+            Param annotation = parameter.getAnnotation(Param.class);
+            nom = annotation.value();
+
+            Field[] attributs = parameterClass.getDeclaredFields();
+
+            for(int j=0 ; j<attributs.length ; j++){
+                if(attributs[j].isAnnotationPresent(NameField.class)){
+                    NameField annotationField = attributs[j].getAnnotation(NameField.class);
+                    requestName = nom+"."+annotationField.value();
+                }
+                else{
+                    requestName = nom+"."+attributs[j].getName();
+                }
+
+                request.setAttribute("error_"+requestName, attributsValue[j]);
+            }
+        }   
+    }
+
     public static Object callFunction2(Mapping map , Method method , Object[] parameters , HttpSession httpSession, HttpServletRequest request)throws Exception{
         String verb = request.getMethod();
+        if(request.getAttribute("error")!=null){
+            verb = "GET";
+        }
         ClassMethod classMethod = map.classMethodByVerb(verb);
 
         Object returned = null;
@@ -332,6 +384,22 @@ public class Utils {
             outputStream.write(buffer, 0, n);
         }
         return outputStream.toByteArray();
+    }
+
+    public static String extractPathFromUrl(String url) {
+        try {
+            java.net.URL refererUrl = new java.net.URL(url);
+            String absolutePath = refererUrl.getPath();
+            String[] split = absolutePath.split("/");
+            String path = "";
+            for(int i=2; i<split.length; i++){
+                path += "/"+split[i];
+            }
+            return path;
+        } catch (java.net.MalformedURLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public static String ErrorPage(String title , String cause){
