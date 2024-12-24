@@ -88,7 +88,16 @@ public class FrontController extends HttpServlet{
                 }
 
                 Gson gson = new Gson();
-                Method method = Utils.callFunction(map , req.getSession(), req);
+                Method method;
+                try {
+
+                    method = Utils.callFunction(map , req.getSession(), req);
+                    
+                } catch (Exception e) {
+                    out.println(e.getMessage());
+                    e.printStackTrace();
+                    return;
+                }
 
                 if(method.getParameterCount()==0){
                     Object returned = Utils.executeFunctionWithNoArgument(map, method, req);
