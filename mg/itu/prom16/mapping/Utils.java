@@ -15,6 +15,7 @@ import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.Part;
+import mg.itu.prom16.annotation.Auth;
 import mg.itu.prom16.annotation.Controller;
 import mg.itu.prom16.annotation.Get;
 import mg.itu.prom16.annotation.Url;
@@ -105,14 +106,21 @@ public class Utils {
         return 0;
     }
 
-    public static Method callFunction(Mapping map , HttpSession httpSession, HttpServletRequest request){
+    public static Method callFunction(Mapping map , HttpSession httpSession, HttpServletRequest request)throws Exception{
         Method returned = null;
         try {
             Method method = (Method)determineMethod(map , httpSession, request);
+            if(method.isAnnotationPresent(Auth.class)){
+                Auth auth = method.getAnnotation(Auth.class);
+                String value = auth.value();
 
+                if(httpSession.getAttribute(value)==null){
+                    throw new Exception("User invalid");
+                }
+            }
             returned = method;
         } catch (Exception e) {
-            
+            throw e;
         }
         return returned;
     }
