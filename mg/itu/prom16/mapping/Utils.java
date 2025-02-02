@@ -23,6 +23,7 @@ import mg.itu.prom16.mapping.utils.Validator;
 import mg.itu.prom16.annotation.NameField;
 import mg.itu.prom16.annotation.Param;
 import mg.itu.prom16.annotation.Post;
+import mg.itu.prom16.annotation.Public;
 
 public class Utils {
     public static ArrayList<String> allControlerName (String controllerPackage){
@@ -106,18 +107,41 @@ public class Utils {
         return 0;
     }
 
+    public static void methodValidation(Method method, Mapping map, HttpServletRequest request, HttpSession httpSession)throws Exception{
+
+        String validation = (String)request.getAttribute("validation");
+        String role = (String)request.getAttribute("role");
+
+        if(!method.isAnnotationPresent(Public.class)){
+            String verb = request.getMethod();
+            if(request.getAttribute("error")!=null){
+                verb = "GET";
+            }
+            ClassMethod classMethod = map.classMethodByVerb(verb);
+
+            Class<?> classe = Class.forName(classMethod.getClassName());
+            if(classe.isAnnotationPresent(Auth.class)){
+                Auth auth = classe.getAnnotation(Auth.class);
+                int value = auth.value();
+
+                if(httpSession.getAttribute(validation)==null || !(boolean)httpSession.getAttribute(validation)){
+                    throw new Exception("User invalid: "+validation);
+                }
+
+                if(httpSession.getAttribute(role)==null || (int)httpSession.getAttribute(role)>value){
+                    throw new Exception("User invalid: "+role);
+                }
+            }
+        }
+    }
+
     public static Method callFunction(Mapping map , HttpSession httpSession, HttpServletRequest request)throws Exception{
         Method returned = null;
         try {
             Method method = (Method)determineMethod(map , httpSession, request);
-            if(method.isAnnotationPresent(Auth.class)){
-                Auth auth = method.getAnnotation(Auth.class);
-                String value = auth.value();
 
-                if(httpSession.getAttribute(value)==null){
-                    throw new Exception("User invalid");
-                }
-            }
+            methodValidation(method, map, request, httpSession);
+            
             returned = method;
         } catch (Exception e) {
             throw e;

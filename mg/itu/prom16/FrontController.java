@@ -24,12 +24,16 @@ import com.google.gson.Gson;
 @MultipartConfig
 public class FrontController extends HttpServlet{
     private String controllerPackage;
+    private String validation;
+    private String role;
     private String error = "";
     private Map<String , Mapping> annotedGetFunction = new HashMap<>();
 
     public void init ()throws ServletException{
         try{
             this.controllerPackage = getServletConfig().getInitParameter("Controllers");
+            this.validation = getServletConfig().getInitParameter("Validation");
+            this.role = getServletConfig().getInitParameter("Role");
 
             Utils.allAnnotedGetFunction(this.annotedGetFunction , this.controllerPackage);
         }
@@ -89,6 +93,8 @@ public class FrontController extends HttpServlet{
 
                 Gson gson = new Gson();
                 Method method;
+                req.setAttribute("validation", this.validation);
+                req.setAttribute("role", this.role);
                 try {
 
                     method = Utils.callFunction(map , req.getSession(), req);
